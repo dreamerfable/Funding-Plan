@@ -20,6 +20,8 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.4
 
       - name: Install node
         uses: actions/setup-node@v6
