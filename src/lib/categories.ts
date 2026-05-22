@@ -1,4 +1,4 @@
-import type { CategoryLevel, CategoryNode } from '../types'
+import type { CategoryLevel, CategoryNode, PlanItem } from '../types'
 
 export function getChildren(categories: CategoryNode[], parentId: string | null): CategoryNode[] {
   return categories
@@ -29,13 +29,16 @@ export function getNode(categories: CategoryNode[], id: string): CategoryNode | 
   return categories.find(c => c.id === id)
 }
 
-export function getPathNames(categories: CategoryNode[], l1: string, l2: string, l3: string): string {
+export function getPathNames(
+  categories: CategoryNode[],
+  l1: string,
+  l2 = '',
+  _legacyL3 = ''
+): string {
   const n1 = getNode(categories, l1)?.name ?? '—'
   if (!l2) return n1
   const n2 = getNode(categories, l2)?.name ?? '—'
-  if (!l3) return `${n1} / ${n2}`
-  const n3 = getNode(categories, l3)?.name ?? '—'
-  return `${n1} / ${n2} / ${n3}`
+  return `${n1} / ${n2}`
 }
 
 export function canDelete(categories: CategoryNode[], id: string): boolean {
@@ -49,5 +52,28 @@ export function collectDescendantIds(categories: CategoryNode[], id: string): st
 
 export function levelOfParent(parent: CategoryNode | undefined): CategoryLevel {
   if (!parent) return 1
-  return (parent.level + 1) as CategoryLevel
+  return 2
+}
+
+/** 将旧版三级分类数据迁移为两级 */
+export function migrateCategoriesToTwoLevels(categories: CategoryNode[]): void {
+  for (const c of categories) {
+    const raw = c.level as number
+    if (raw === 3) {
+      const parent = c.parentId ? getNode(categories, c.parentId) : undefined
+      c.level = 2
+      c.parentId = parent?.level === 2 ? parent.parentId : parent?.parentId ?? null
+    } else if (raw > 2) {
+      c.level = c.parentId ? 2 : 1
+    }
+  }
+}
+
+export function migratePlanItemsToTwoLevels(items: PlanItem[]): void {
+  for (const item of items) {
+    if (item.categoryL3Id) {
+      item.categoryL2Id = item.categoryL3Id
+      item.categoryL3Id = ''
+    }
+  }
 }

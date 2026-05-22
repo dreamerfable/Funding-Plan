@@ -5,6 +5,7 @@ import { useAppStore } from '../composables/useAppStore'
 import { getChildren } from '../lib/categories'
 import {
   categoryTotalPercent,
+  formatPlanPercent,
   hasDirectProducts,
   itemsUnderNode,
   planItemTotalPercent
@@ -21,16 +22,16 @@ const { state } = useAppStore()
 
 function weightRight(node: CategoryNode, mode: 'parent' | 'total'): string {
   if (mode === 'total' && node.level > 1) {
-    return `${categoryTotalPercent(state.categories, node.id).toFixed(1)}%`
+    return formatPlanPercent(categoryTotalPercent(state.categories, node.id))
   }
-  return `${(Number(node.weightOfParent) || 0).toFixed(1)}%`
+  return formatPlanPercent(Number(node.weightOfParent) || 0)
 }
 
 function itemWeightRight(item: PlanItem, mode: 'parent' | 'total'): string {
   if (mode === 'total') {
-    return `${planItemTotalPercent(state.categories, item).toFixed(2)}%`
+    return formatPlanPercent(planItemTotalPercent(state.categories, item))
   }
-  return `${(Number(item.targetPercent) || 0).toFixed(1)}%`
+  return formatPlanPercent(item.targetPercent)
 }
 </script>
 
@@ -79,26 +80,6 @@ function itemWeightRight(item: PlanItem, mode: 'parent' | 'total'): string {
             >
               <span class="flex-1 text-xs truncate">{{ item.name || '—' }}</span>
               <span class="tabular-nums text-[11px] text-muted/90 shrink-0">{{ itemWeightRight(item, weightMode) }}</span>
-            </li>
-          </ul>
-
-          <ul v-else-if="getChildren(state.categories, l2.id).length">
-            <li v-for="l3 in getChildren(state.categories, l2.id)" :key="l3.id">
-              <div class="flex items-center gap-2 pl-10 pr-3 py-1.5">
-                <span class="flex-1 text-xs text-muted truncate">{{ l3.name }}</span>
-                <span class="tabular-nums text-xs shrink-0">{{ weightRight(l3, weightMode) }}</span>
-              </div>
-
-              <ul v-if="showItems && itemsUnderNode(state.plan.items, l3.id, 3).length" class="pb-1.5">
-                <li
-                  v-for="item in itemsUnderNode(state.plan.items, l3.id, 3)"
-                  :key="item.id"
-                  class="flex items-center gap-2 pl-14 pr-3 py-1"
-                >
-                  <span class="flex-1 text-xs truncate">{{ item.name || '—' }}</span>
-                  <span class="tabular-nums text-[11px] text-muted/90 shrink-0">{{ itemWeightRight(item, weightMode) }}</span>
-                </li>
-              </ul>
             </li>
           </ul>
         </li>

@@ -26,17 +26,31 @@ function render() {
     type: 'line',
     data: {
       labels: props.labels,
-      datasets: props.datasets.map((d, i) => ({
-        label: d.label,
-        data: d.data,
-        borderColor: palette[i % palette.length],
-        backgroundColor: palette[i % palette.length] + '33',
-        tension: 0.35,
-        fill: false,
-        pointRadius: 3
-      }))
+      datasets: props.datasets.map((d, i) => {
+        const color = palette[i % palette.length]
+        return {
+          label: d.label,
+          data: d.data,
+          borderColor: color,
+          backgroundColor: color + '33',
+          pointBackgroundColor: color,
+          pointBorderColor: color,
+          pointBorderWidth: 0,
+          tension: 0.4,
+          cubicInterpolationMode: 'monotone',
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 5
+        }
+      })
     },
     options: {
+      elements: {
+        line: {
+          tension: 0.4,
+          cubicInterpolationMode: 'monotone'
+        }
+      },
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },

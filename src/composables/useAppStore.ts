@@ -43,7 +43,12 @@ export function useAppStore() {
     state.plan.updatedAt = new Date().toISOString()
   }
 
-  function addCategory(name: string, parentId: string | null, level: CategoryNode['level']) {
+  function addCategory(
+    name: string,
+    parentId: string | null,
+    level: CategoryNode['level'],
+    weightOfParent = 0
+  ) {
     const siblings = state.categories.filter(c => c.parentId === parentId)
     const maxOrder = siblings.reduce((m, c) => Math.max(m, c.sortOrder ?? -1), -1)
     const node: CategoryNode = {
@@ -52,7 +57,7 @@ export function useAppStore() {
       level,
       parentId,
       sortOrder: maxOrder + 1,
-      weightOfParent: 0
+      weightOfParent: Number(weightOfParent) || 0
     }
     if (level === 1) node.iconKey = guessIconKey(name)
     state.categories.push(node)
@@ -78,7 +83,10 @@ export function useAppStore() {
     const ids = [id, ...collectDescendantIds(state.categories, id)]
     state.categories = state.categories.filter(c => !ids.includes(c.id))
     state.plan.items = state.plan.items.filter(
-      i => !ids.includes(i.categoryL1Id) && !ids.includes(i.categoryL2Id) && !ids.includes(i.categoryL3Id)
+      i =>
+        !ids.includes(i.categoryL1Id) &&
+        !ids.includes(i.categoryL2Id) &&
+        !(i.categoryL3Id && ids.includes(i.categoryL3Id))
     )
   }
 

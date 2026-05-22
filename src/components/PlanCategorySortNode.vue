@@ -43,12 +43,12 @@ const siblings = computed({
         <PlanL1Icon v-if="node.level === 1" :icon-key="node.iconKey" size="sm" class="shrink-0" />
         <span
           class="flex-1 truncate"
-          :class="node.level === 1 ? 'text-sm font-medium' : node.level === 2 ? 'text-sm' : 'text-xs font-medium'"
+          :class="node.level === 1 ? 'text-sm font-medium' : 'text-sm'"
         >
           {{ node.name }}
         </span>
       </div>
-      <div v-if="node.level < 3" class="border-t border-default/50 bg-default/15">
+      <div v-if="node.level < 2" class="border-t border-default/50 bg-default/15">
         <PlanCategorySortNode :parent-id="node.id" />
       </div>
     </div>

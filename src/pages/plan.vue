@@ -38,8 +38,21 @@ function onPlanSaved() {
       <PlanChartPanel />
     </UCard>
 
-    <UCard v-else class="glass-card mt-4">
+    <UCard v-else class="glass-card mt-4 plan-config">
       <PlanTreePanel @save="onPlanSaved" />
     </UCard>
   </UContainer>
 </template>
+
+<style scoped>
+.plan-config :deep(input[type='number']) {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.plan-config :deep(input[type='number']::-webkit-inner-spin-button),
+.plan-config :deep(input[type='number']::-webkit-outer-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
+}
+</style>

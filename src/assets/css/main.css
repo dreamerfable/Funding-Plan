@@ -3,6 +3,7 @@
 
 @theme static {
   --font-sans: 'DM Sans', 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-lexend-deca: 'Lexend Deca', ui-sans-serif, sans-serif;
 
   --color-emerald-50: oklch(96.5% 0.03 163);
   --color-emerald-500: oklch(65% 0.15 160);

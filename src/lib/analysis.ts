@@ -1,6 +1,6 @@
 import type { AnalysisLevel, CategoryNode, PlanRowAnalysis, Snapshot, SnapshotLine } from '../types'
-import { getChildren, getNode, getPathNames } from './categories'
-import { planItemTotalPercent } from './plan'
+import { getChildren, getNode } from './categories'
+import { itemsUnderNode, planItemTotalPercent } from './plan'
 
 function lineMap(lines: SnapshotLine[]): Map<string, number> {
   return new Map(lines.map(l => [l.planItemId, l.amount]))
@@ -8,6 +8,59 @@ function lineMap(lines: SnapshotLine[]): Map<string, number> {
 
 function investable(snapshot: Snapshot): number {
   return snapshot.totalAmount - snapshot.excludeAmount
+}
+
+/** 按记录日、更新时间降序；首页与分析「最新一期」共用 */
+export function compareSnapshotRecency(a: Snapshot, b: Snapshot): number {
+  const byDate = b.recordedAt.localeCompare(a.recordedAt)
+  if (byDate !== 0) return byDate
+  return b.updatedAt.localeCompare(a.updatedAt)
+}
+
+export function getLatestSnapshot(snapshots: Snapshot[]): Snapshot | undefined {
+  if (!snapshots.length) return undefined
+  return [...snapshots].sort(compareSnapshotRecency)[0]
+}
+
+export function getPreviousSnapshot(
+  snapshots: Snapshot[],
+  latest: Snapshot
+): Snapshot | undefined {
+  const sorted = [...snapshots].sort(compareSnapshotRecency)
+  const idx = sorted.findIndex(s => s.id === latest.id)
+  return idx >= 0 && idx + 1 < sorted.length ? sorted[idx + 1] : undefined
+}
+
+/** 仅遍历快照冻结计划中出现过的分类 id */
+export function categoryIdsInSnapshot(snapshot: Snapshot): Set<string> {
+  const ids = new Set<string>()
+  for (const item of snapshot.frozenPlan.items) {
+    ids.add(item.categoryL1Id)
+    if (item.categoryL2Id) ids.add(item.categoryL2Id)
+  }
+  return ids
+}
+
+export function l1NodesInSnapshot(snapshot: Snapshot, categories: CategoryNode[]): CategoryNode[] {
+  const ids = new Set<string>()
+  for (const item of snapshot.frozenPlan.items) ids.add(item.categoryL1Id)
+  return getChildren(categories, null)
+    .filter(c => ids.has(c.id))
+    .slice()
+}
+
+export function l2NodesInSnapshot(
+  snapshot: Snapshot,
+  categories: CategoryNode[],
+  l1Id: string
+): CategoryNode[] {
+  const ids = new Set<string>()
+  for (const item of snapshot.frozenPlan.items) {
+    if (item.categoryL1Id === l1Id && item.categoryL2Id) ids.add(item.categoryL2Id)
+  }
+  return getChildren(categories, l1Id)
+    .filter(c => ids.has(c.id))
+    .slice()
 }
 
 function actualTotal(lines: SnapshotLine[]): number {
@@ -45,6 +98,7 @@ export function analyzeSnapshot(
   const amounts = lineMap(snapshot.lines)
   const map = new Map<string, AggKey>()
 
+  // 实际金额仅来自该快照 lines；计划项仅来自 frozenPlan
   for (const item of snapshot.frozenPlan.items) {
     const actual = amounts.get(item.id) ?? 0
     const targetPct = planItemTotalPercent(categories, item)
@@ -62,19 +116,10 @@ export function analyzeSnapshot(
         actualAmount: actual
       })
     }
-    if (item.categoryL3Id) {
-      entries.push({
-        key: `l3:${item.categoryL3Id}`,
-        label: getPathNames(categories, item.categoryL1Id, item.categoryL2Id, item.categoryL3Id),
-        level: 3,
-        targetPercent: targetPct,
-        actualAmount: actual
-      })
-    }
     entries.push({
       key: `item:${item.id}`,
       label: item.name,
-      level: 3,
+      level: 2,
       targetPercent: targetPct,
       actualAmount: actual
     })
@@ -83,7 +128,6 @@ export function analyzeSnapshot(
       if (level && e.level !== level) {
         if (level === 1 && e.level !== 1) continue
         if (level === 2 && e.level !== 2) continue
-        if (level === 3 && e.level !== 3 && !e.key.startsWith('item:')) continue
       }
       upsertAgg(map, e, targetPct, actual)
     }
@@ -120,26 +164,26 @@ export function analyzeItemLevel(snapshot: Snapshot, categories: CategoryNode[])
   return analyzeSnapshot(snapshot, categories).rows
 }
 
-/** 某分类分组下所有具体产品的偏离行 */
+/** 某分类节点下直接挂载的具体产品偏离行（L1 不含其下 L2 中的产品） */
 export function analyzeItemsUnderCategory(
   snapshot: Snapshot,
   categories: CategoryNode[],
   node: CategoryNode
 ): PlanRowAnalysis[] {
-  const itemRows = analyzeSnapshot(snapshot, categories).rows
-  return itemRows.filter(row => {
-    const item = snapshot.frozenPlan.items.find(i => row.key === `item:${i.id}`)
-    if (!item) return false
-    if (node.level === 1) return item.categoryL1Id === node.id
-    if (node.level === 2) return item.categoryL2Id === node.id
-    return item.categoryL3Id === node.id
-  })
+  const allowed = new Set(
+    itemsUnderNode(snapshot.frozenPlan.items, node.id, node.level).map(i => `item:${i.id}`)
+  )
+  return analyzeSnapshot(snapshot, categories).rows.filter(row => allowed.has(row.key))
 }
 
 export type ChartScopeId = 'all' | string
 
 function chartRowVisible(row: PlanRowAnalysis | undefined): row is PlanRowAnalysis {
   return !!row && (Math.abs(row.targetPercent) > 0.01 || Math.abs(row.actualAmount) > 0.01)
+}
+
+function chartRowForCategory(node: CategoryNode, row: PlanRowAnalysis): PlanRowAnalysis {
+  return { ...row, label: node.name }
 }
 
 /** 图表：展示所选节点下子级（无子分类时展示具体产品） */
@@ -152,7 +196,12 @@ export function analyzeChartForScope(
   const rowOf = (id: string) => map.get(id)
 
   if (scopeId === 'all') {
-    return getChildren(categories, null).map(c => rowOf(c.id)).filter(chartRowVisible)
+    return getChildren(categories, null)
+      .map(c => {
+        const row = rowOf(c.id)
+        return row ? chartRowForCategory(c, row) : undefined
+      })
+      .filter(chartRowVisible)
   }
 
   const node = getNode(categories, scopeId)
@@ -160,19 +209,24 @@ export function analyzeChartForScope(
 
   const childCats = getChildren(categories, node.id)
   if (childCats.length) {
-    return childCats.map(c => rowOf(c.id)).filter(chartRowVisible)
+    return childCats
+      .map(c => {
+        const row = rowOf(c.id)
+        return row ? chartRowForCategory(c, row) : undefined
+      })
+      .filter(chartRowVisible)
   }
 
   return analyzeItemsUnderCategory(snapshot, categories, node)
 }
 
-/** 按分类 id 索引单期分析行（L1/L2/L3） */
+/** 按分类 id 索引单期分析行（L1/L2） */
 export function buildCategoryAnalysisMap(
   snapshot: Snapshot,
   categories: CategoryNode[]
 ): Map<string, PlanRowAnalysis> {
   const map = new Map<string, PlanRowAnalysis>()
-  for (const level of [1, 2, 3] as const) {
+  for (const level of [1, 2] as const) {
     for (const row of analyzeSnapshot(snapshot, categories, level).rows) {
       const id = row.key.split(':')[1]
       if (id) map.set(id, row)
@@ -197,6 +251,7 @@ export interface TrendCell {
   amount: number
   percent: number
   targetPercent: number
+  targetAmount: number
   percentGap: number
   amountGap: number
   gapTrend: 'wider' | 'narrower' | 'same' | null
@@ -206,6 +261,85 @@ export interface TrendRow {
   key: string
   label: string
   cells: TrendCell[]
+}
+
+export function categoryAnalysisKey(node: CategoryNode): string {
+  return `l${node.level}:${node.id}`
+}
+
+function findAnalysisRowByKey(
+  snapshot: Snapshot,
+  categories: CategoryNode[],
+  rowKey: string
+): PlanRowAnalysis | undefined {
+  if (rowKey.startsWith('item:')) {
+    return analyzeSnapshot(snapshot, categories).rows.find(r => r.key === rowKey)
+  }
+  const level = Number(rowKey[1]) as AnalysisLevel
+  return analyzeSnapshot(snapshot, categories, level).rows.find(r => r.key === rowKey)
+}
+
+export function trendCellsForRowKey(
+  snapshots: Snapshot[],
+  categories: CategoryNode[],
+  rowKey: string
+): TrendCell[] {
+  const sorted = [...snapshots].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+  const cells: TrendCell[] = []
+  let prevGap: number | null = null
+  for (const s of sorted) {
+    const row = findAnalysisRowByKey(s, categories, rowKey)
+    if (!row) {
+      cells.push({
+        amount: 0,
+        percent: 0,
+        targetPercent: 0,
+        targetAmount: 0,
+        percentGap: 0,
+        amountGap: 0,
+        gapTrend: null
+      })
+      continue
+    }
+    const gap = row.percentGap
+    let gapTrend: TrendCell['gapTrend'] = null
+    if (prevGap !== null) {
+      const diff = Math.abs(gap) - Math.abs(prevGap)
+      if (Math.abs(diff) < 0.01) gapTrend = 'same'
+      else gapTrend = diff > 0 ? 'wider' : 'narrower'
+    }
+    cells.push({
+      amount: row.actualAmount,
+      percent: row.actualPercent,
+      targetPercent: row.targetPercent,
+      targetAmount: row.targetAmount,
+      percentGap: row.percentGap,
+      amountGap: row.amountGap,
+      gapTrend
+    })
+    prevGap = gap
+  }
+  return cells
+}
+
+export function productRowKeysUnderCategory(
+  snapshots: Snapshot[],
+  categories: CategoryNode[],
+  node: CategoryNode
+): string[] {
+  const keys = new Set<string>()
+  for (const s of snapshots) {
+    for (const row of analyzeItemsUnderCategory(s, categories, node)) keys.add(row.key)
+  }
+  const nameOf = (key: string) => {
+    const id = key.slice(5)
+    for (const s of snapshots) {
+      const item = s.frozenPlan.items.find(i => i.id === id)
+      if (item?.name) return item.name
+    }
+    return key
+  }
+  return [...keys].sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'zh'))
 }
 
 export function buildTrendTable(
@@ -223,57 +357,81 @@ export function buildTrendTable(
 
   const rows: TrendRow[] = []
   for (const key of [...keys].sort()) {
-    const cells: TrendCell[] = []
-    let prevGap: number | null = null
-    let label = key
-    for (const s of sorted) {
-      const row = analyzeSnapshot(s, categories, level).rows.find(r => r.key === key)
-      if (!row) {
-        cells.push({ amount: 0, percent: 0, targetPercent: 0, percentGap: 0, amountGap: 0, gapTrend: null })
-        continue
-      }
-      label = row.label
-      const gap = row.percentGap
-      let gapTrend: TrendCell['gapTrend'] = null
-      if (prevGap !== null) {
-        const diff = Math.abs(gap) - Math.abs(prevGap)
-        if (Math.abs(diff) < 0.01) gapTrend = 'same'
-        else gapTrend = diff > 0 ? 'wider' : 'narrower'
-      }
-      cells.push({
-        amount: row.actualAmount,
-        percent: row.actualPercent,
-        targetPercent: row.targetPercent,
-        percentGap: row.percentGap,
-        amountGap: row.amountGap,
-        gapTrend
-      })
-      prevGap = gap
-    }
+    const cells = trendCellsForRowKey(sorted, categories, key)
+    const label = findAnalysisRowByKey(sorted[0], categories, key)?.label ?? key
     rows.push({ key, label, cells })
   }
   return rows
 }
 
-export function trendChartSeries(
+function displayLabelForTrendKey(
   snapshots: Snapshot[],
   categories: CategoryNode[],
-  level: AnalysisLevel,
-  topN = 8
+  rowKey: string
+): string {
+  if (rowKey.startsWith('item:')) {
+    const id = rowKey.slice(5)
+    for (const s of snapshots) {
+      const item = s.frozenPlan.items.find(i => i.id === id)
+      if (item?.name) return item.name
+    }
+    return '—'
+  }
+  const id = rowKey.split(':')[1]
+  return getNode(categories, id)?.name ?? rowKey
+}
+
+/** 趋势图：所选节点下的子级行 key（与柱状图 scope 规则一致） */
+export function trendRowKeysForScope(
+  snapshots: Snapshot[],
+  categories: CategoryNode[],
+  scopeId: ChartScopeId
+): string[] {
+  if (scopeId === 'all') {
+    return getChildren(categories, null).map(c => categoryAnalysisKey(c))
+  }
+  const node = getNode(categories, scopeId)
+  if (!node) return []
+  const childCats = getChildren(categories, node.id)
+  if (childCats.length) return childCats.map(c => categoryAnalysisKey(c))
+  return productRowKeysUnderCategory(snapshots, categories, node)
+}
+
+export function trendChartSeriesForScope(
+  snapshots: Snapshot[],
+  categories: CategoryNode[],
+  scopeId: ChartScopeId,
+  maxSeries = 12
 ): { labels: string[]; datasets: { label: string; data: (number | null)[] }[] } {
+  if (!snapshots.length) return { labels: [], datasets: [] }
   const sorted = [...snapshots].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
   const labels = sorted.map(s => s.label)
-  const table = buildTrendTable(sorted, categories, level)
-  const ranked = table
-    .map(r => ({ ...r, maxAbs: Math.max(...r.cells.map(c => Math.abs(c.percentGap))) }))
+  const keys = trendRowKeysForScope(sorted, categories, scopeId)
+  const series = keys.map(key => {
+    const cells = trendCellsForRowKey(sorted, categories, key)
+    const maxAbs = Math.max(0, ...cells.map(c => Math.abs(c.percentGap)))
+    return {
+      label: displayLabelForTrendKey(sorted, categories, key),
+      data: cells.map(c => c.percentGap),
+      maxAbs
+    }
+  })
+  const visible = series.filter(s => s.maxAbs > 0.01)
+  const ranked = (visible.length ? visible : series)
     .sort((a, b) => b.maxAbs - a.maxAbs)
-    .slice(0, topN)
+    .slice(0, maxSeries)
 
   return {
     labels,
-    datasets: ranked.map(r => ({
-      label: r.label,
-      data: r.cells.map(c => c.percentGap)
-    }))
+    datasets: ranked.map(({ label, data }) => ({ label, data }))
   }
+}
+
+export function trendChartSeries(
+  snapshots: Snapshot[],
+  categories: CategoryNode[],
+  _level: AnalysisLevel,
+  topN = 8
+): { labels: string[]; datasets: { label: string; data: (number | null)[] }[] } {
+  return trendChartSeriesForScope(snapshots, categories, 'all', topN)
 }

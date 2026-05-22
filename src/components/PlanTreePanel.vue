@@ -1,29 +1,45 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowDownUp, FolderPlus, ListPlus, Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { AlertTriangle, ArrowDownUp, FolderPlus, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import PlanCategorySortPanel from './PlanCategorySortPanel.vue'
 import PlanL1Icon from './PlanL1Icon.vue'
 import PlanProductRows from './PlanProductRows.vue'
+import PlanRowMobile from './PlanRowMobile.vue'
+import { planRowKey, providePlanMobileExpand } from '../composables/usePlanMobileExpand'
 import { useAppStore } from '../composables/useAppStore'
 import { canDelete, getChildren, levelOfParent } from '../lib/categories'
 import { L1_ICON_OPTIONS } from '../lib/l1-icons'
 import {
-  canAddChildCategory,
   canAddProduct,
   categoryTotalPercent,
+  l1AddKind,
   hasDirectProducts,
   isPlanBalanced,
   itemsUnderNode,
   isNodeSiblingSumBalanced,
-  nodeSiblingSumLabel,
-  planItemsTotalPercentSum
+  nodeSiblingSumValue,
+  formatPlanPercent,
+  planItemsTotalPercentSum,
+  showCategoryWithinGroup
 } from '../lib/plan'
+import {
+  planRowCell,
+  planRowCol,
+  planRowGrid,
+  planRowIconClass,
+  planRowNameClass,
+  planRowCard,
+  planModalFormField,
+  planModalInput,
+  planRowWithinGroupClass
+} from '../lib/plan-row-layout'
 import type { CategoryNode, L1IconKey } from '../types'
 
 const emit = defineEmits<{ save: [] }>()
 
 const { t } = useI18n()
+const toast = useToast()
 const {
   state,
   addCategory,
@@ -33,14 +49,56 @@ const {
   confirmPlanSave
 } = useAppStore()
 
+const { collapseRow } = providePlanMobileExpand()
+
 const addingParent = ref<string | 'root' | null>(null)
 const newCatName = ref('')
+const newCatWeight = ref(0)
 const addModalOpen = computed({
   get: () => addingParent.value !== null,
   set: (open: boolean) => {
     if (!open) {
       addingParent.value = null
       newCatName.value = ''
+      newCatWeight.value = 0
+    }
+  }
+})
+const editCatModalOpen = computed({
+  get: () => editingCatId.value !== null,
+  set: (open: boolean) => {
+    if (!open) cancelEditCat()
+  }
+})
+const editingCatNode = computed(() =>
+  editingCatId.value ? state.categories.find(c => c.id === editingCatId.value) : undefined
+)
+const editingCatIsL1 = computed(() => editingCatNode.value?.level === 1)
+
+const l1AddChoiceOpen = ref(false)
+const l1AddChoiceTarget = ref<CategoryNode | null>(null)
+const l1AddChoiceModalOpen = computed({
+  get: () => l1AddChoiceOpen.value,
+  set: (open: boolean) => {
+    if (!open) {
+      l1AddChoiceOpen.value = false
+      l1AddChoiceTarget.value = null
+    }
+  }
+})
+
+const productAddOpen = ref(false)
+const productAddCtx = ref<{ l1Id: string; l2Id: string } | null>(null)
+const newProductName = ref('')
+const newProductWeight = ref(0)
+const productAddModalOpen = computed({
+  get: () => productAddOpen.value,
+  set: (open: boolean) => {
+    if (!open) {
+      productAddOpen.value = false
+      productAddCtx.value = null
+      newProductName.value = ''
+      newProductWeight.value = 0
     }
   }
 })
@@ -53,6 +111,7 @@ const addModalTitle = computed(() => {
 })
 const editingCatId = ref<string | null>(null)
 const editCatName = ref('')
+const editCatWeight = ref(0)
 const iconPickerL1 = ref<string | null>(null)
 const sortMode = ref(false)
 
@@ -62,6 +121,10 @@ function toggleSortMode() {
     addingParent.value = null
     editingCatId.value = null
     iconPickerL1.value = null
+    collapseRow()
+    productAddOpen.value = false
+    l1AddChoiceOpen.value = false
+    l1AddChoiceTarget.value = null
   }
 }
 
@@ -73,37 +136,124 @@ const balanced = computed(() => isPlanBalanced(state.categories, state.plan.item
 const totalWeight = computed(() => planItemsTotalPercentSum(state.categories, state.plan.items))
 
 function startAddCat(parentId: string | null) {
+  collapseRow()
   addingParent.value = parentId ?? 'root'
   newCatName.value = ''
+  newCatWeight.value = 0
 }
 
 function confirmAddCat() {
   if (!newCatName.value.trim() || addingParent.value === null) return
   const parentId = addingParent.value === 'root' ? null : addingParent.value
   const parent = parentId ? state.categories.find(c => c.id === parentId) : undefined
-  addCategory(newCatName.value, parentId, levelOfParent(parent))
+  addCategory(newCatName.value, parentId, levelOfParent(parent), newCatWeight.value)
   addingParent.value = null
   newCatName.value = ''
+  newCatWeight.value = 0
+}
+
+function onRemoveCategory(id: string) {
+  collapseRow()
+  removeCategory(id)
 }
 
 function startEditCat(node: CategoryNode) {
+  collapseRow()
   editingCatId.value = node.id
   editCatName.value = node.name
+  editCatWeight.value = Number(node.weightOfParent) || 0
 }
 
-function confirmEditCat() {
-  if (editingCatId.value) updateCategory(editingCatId.value, { name: editCatName.value })
+function cancelEditCat() {
   editingCatId.value = null
 }
 
-function addProduct(l1: CategoryNode, l2?: CategoryNode, l3?: CategoryNode) {
-  addPlanItem({
-    name: '',
-    categoryL1Id: l1.id,
-    categoryL2Id: l2?.id ?? '',
-    categoryL3Id: l3?.id ?? '',
-    targetPercent: 0
+function confirmEditCat() {
+  if (editingCatId.value) {
+    updateCategory(editingCatId.value, {
+      name: editCatName.value,
+      weightOfParent: Number(editCatWeight.value) || 0
+    })
+  }
+  editingCatId.value = null
+}
+
+function formatWithinGroupWeight(node: CategoryNode) {
+  return formatPlanPercent(Number(node.weightOfParent) || 0)
+}
+
+function formatTotalPercent(nodeId: string) {
+  return formatPlanPercent(categoryTotalPercent(state.categories, nodeId))
+}
+
+function showChildSumWarn(nodeId: string, level: 1 | 2) {
+  const sum = nodeSiblingSumValue(state.categories, state.plan.items, nodeId, level)
+  if (sum === null) return false
+  return !isNodeSiblingSumBalanced(state.categories, state.plan.items, nodeId, level)
+}
+
+function notifyChildSumUnbalanced() {
+  toast.add({
+    title: t('plan.childSumWarnTitle'),
+    description: t('plan.childSumWarnDesc'),
+    color: 'warning'
   })
+}
+
+function onL1AddClick(l1: CategoryNode) {
+  const kind = l1AddKind(state.categories, state.plan.items, l1.id)
+  if (!kind) return
+  collapseRow()
+  if (kind === 'choice') {
+    l1AddChoiceTarget.value = l1
+    l1AddChoiceOpen.value = true
+    return
+  }
+  if (kind === 'product') openAddProduct(l1)
+  else startAddCat(l1.id)
+}
+
+function chooseAddSubCategoryFromL1() {
+  const l1 = l1AddChoiceTarget.value
+  if (!l1) return
+  l1AddChoiceOpen.value = false
+  l1AddChoiceTarget.value = null
+  startAddCat(l1.id)
+}
+
+function chooseAddProductFromL1() {
+  const l1 = l1AddChoiceTarget.value
+  if (!l1) return
+  l1AddChoiceOpen.value = false
+  l1AddChoiceTarget.value = null
+  openAddProduct(l1)
+}
+
+function openAddProduct(l1: CategoryNode, l2?: CategoryNode) {
+  collapseRow()
+  productAddCtx.value = {
+    l1Id: l1.id,
+    l2Id: l2?.id ?? ''
+  }
+  newProductName.value = ''
+  newProductWeight.value = 0
+  productAddOpen.value = true
+}
+
+function confirmAddProduct() {
+  if (!productAddCtx.value || !newProductName.value.trim()) return
+  const { l1Id, l2Id } = productAddCtx.value
+  addPlanItem({
+    name: newProductName.value.trim(),
+    categoryL1Id: l1Id,
+    categoryL2Id: l2Id,
+    categoryL3Id: '',
+    targetPercent: Number(newProductWeight.value) || 0
+  })
+  productAddOpen.value = false
+  productAddCtx.value = null
+  newProductName.value = ''
+  newProductWeight.value = 0
 }
 
 function onSaveClick() {
@@ -111,11 +261,6 @@ function onSaveClick() {
   emit('save')
 }
 
-function childSumClass(nodeId: string, level: 1 | 2 | 3) {
-  return isNodeSiblingSumBalanced(state.categories, state.plan.items, nodeId, level)
-    ? 'text-muted'
-    : 'text-error font-medium'
-}
 </script>
 
 <template>
@@ -137,7 +282,7 @@ function childSumClass(nodeId: string, level: 1 | 2 | 3) {
         </UButton>
       </div>
       <UBadge v-if="!sortMode" :color="balanced ? 'success' : 'warning'" variant="subtle" size="lg">
-        {{ t('plan.totalWeight') }} {{ totalWeight.toFixed(1) }}%
+        {{ t('plan.totalWeight') }} {{ formatPlanPercent(totalWeight) }}
       </UBadge>
       <UBadge v-else color="primary" variant="subtle" size="lg">
         {{ t('plan.sortModeActive') }}
@@ -153,9 +298,74 @@ function childSumClass(nodeId: string, level: 1 | 2 | 3) {
 
     <ul v-else class="space-y-2">
       <template v-for="l1 in getChildren(state.categories, null)" :key="l1.id">
-        <li class="rounded-xl border border-default bg-elevated/40 overflow-hidden">
-          <div class="flex items-center gap-2.5 px-3 py-2.5 min-h-[48px]">
-            <div class="relative shrink-0 flex items-center">
+        <li :class="planRowCard">
+          <PlanRowMobile
+            :row-key="planRowKey('cat', l1.id)"
+            :name="l1.name"
+            :name-class="planRowNameClass[1]"
+            :within="formatWithinGroupWeight(l1)"
+            :total="formatTotalPercent(l1.id)"
+            :level="1"
+            :show-warn="showChildSumWarn(l1.id, 1)"
+            :show-within="showCategoryWithinGroup(1)"
+            extra-class="py-2.5"
+            @warn="notifyChildSumUnbalanced"
+          >
+            <template #leading>
+              <div class="relative flex size-5 shrink-0 items-center justify-center" @click.stop>
+                <button
+                  type="button"
+                  class="flex size-5 items-center justify-center text-primary hover:opacity-80"
+                  @click="iconPickerL1 = iconPickerL1 === l1.id ? null : l1.id"
+                >
+                  <PlanL1Icon :icon-key="l1.iconKey" size="sm" />
+                </button>
+                <div
+                  v-if="iconPickerL1 === l1.id"
+                  class="absolute left-0 top-full z-20 mt-1 flex gap-1 rounded-lg border border-default bg-default p-1.5 shadow-lg"
+                >
+                  <button
+                    v-for="opt in L1_ICON_OPTIONS"
+                    :key="opt.key"
+                    type="button"
+                    class="p-1 text-muted hover:text-primary"
+                    :class="l1.iconKey === opt.key ? 'text-primary' : ''"
+                    @click="updateCategory(l1.id, { iconKey: opt.key as L1IconKey }); iconPickerL1 = null"
+                  >
+                    <PlanL1Icon :icon-key="opt.key" size="sm" />
+                  </button>
+                </div>
+              </div>
+            </template>
+            <template #actions>
+                <UButton
+                  v-if="l1AddKind(state.categories, state.plan.items, l1.id)"
+                  size="xs"
+                  variant="ghost"
+                  :class="planRowCell.action"
+                  @click="onL1AddClick(l1)"
+                >
+                  <Plus :class="planRowIconClass" />
+                </UButton>
+                <span v-else :class="planRowCol.actionSlot" aria-hidden="true" />
+                <UButton size="xs" variant="ghost" :class="planRowCell.action" @click="startEditCat(l1)">
+                <Pencil :class="planRowIconClass" />
+              </UButton>
+              <UButton
+                size="xs"
+                variant="ghost"
+                color="error"
+                :class="planRowCell.action"
+                :disabled="!canDelete(state.categories, l1.id)"
+                @click="onRemoveCategory(l1.id)"
+              >
+                <Trash2 :class="planRowIconClass" />
+              </UButton>
+            </template>
+          </PlanRowMobile>
+
+          <div :class="[planRowGrid, 'py-2.5']">
+            <div class="relative flex items-center justify-center size-5 shrink-0">
               <button
                 type="button"
                 class="flex size-5 items-center justify-center text-primary hover:opacity-80 transition-opacity"
@@ -180,176 +390,147 @@ function childSumClass(nodeId: string, level: 1 | 2 | 3) {
               </div>
             </div>
 
-            <template v-if="editingCatId === l1.id">
-              <UInput v-model="editCatName" size="sm" class="flex-1 min-w-0" @keyup.enter="confirmEditCat" />
-              <UButton size="xs" @click="confirmEditCat">{{ t('common.save') }}</UButton>
-            </template>
-            <template v-else>
-              <span class="flex-1 font-medium text-sm leading-5 min-w-0 truncate self-center">{{ l1.name }}</span>
-              <UInput
-                :model-value="l1.weightOfParent ?? 0"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                size="xs"
-                class="w-[4.25rem] shrink-0"
-                @update:model-value="updateCategory(l1.id, { weightOfParent: Number($event) })"
-              >
-                <template #trailing>%</template>
-              </UInput>
-              <span
-                class="text-[10px] tabular-nums shrink-0 w-10 text-right"
-                :class="childSumClass(l1.id, 1)"
-                :title="t('plan.childSum')"
-              >
-                {{ nodeSiblingSumLabel(state.categories, state.plan.items, l1.id, 1) }}
-              </span>
-              <div class="flex gap-0.5 shrink-0">
+            <span :class="planRowNameClass[1]">{{ l1.name }}</span>
+              <div :class="planRowCell.childSum">
                 <UButton
-                  v-if="canAddProduct(state.categories, state.plan.items, l1.id, 1)"
+                  v-if="showChildSumWarn(l1.id, 1)"
                   size="xs"
                   variant="ghost"
-                  color="primary"
-                  @click="addProduct(l1)"
+                  color="warning"
+                  :class="planRowCell.action"
+                  :aria-label="t('plan.childSumWarnTitle')"
+                  @click="notifyChildSumUnbalanced"
                 >
-                  <ListPlus class="size-3.5" />
-                </UButton>
-                <UButton
-                  v-if="canAddChildCategory(state.categories, state.plan.items, l1.id, 1)"
-                  size="xs"
-                  variant="ghost"
-                  @click="startAddCat(l1.id)"
-                >
-                  <Plus class="size-3.5" />
-                </UButton>
-                <UButton size="xs" variant="ghost" @click="startEditCat(l1)"><Pencil class="size-3.5" /></UButton>
-                <UButton size="xs" variant="ghost" color="error" :disabled="!canDelete(state.categories, l1.id)" @click="removeCategory(l1.id)">
-                  <Trash2 class="size-3.5" />
+                  <AlertTriangle :class="planRowIconClass" />
                 </UButton>
               </div>
-            </template>
+              <span :class="planRowWithinGroupClass[1]">
+                <template v-if="showCategoryWithinGroup(1)">{{ formatWithinGroupWeight(l1) }}</template>
+              </span>
+              <span :class="planRowCell.ofTotal">{{ formatTotalPercent(l1.id) }}</span>
+              <span :class="planRowCell.actionsGap" aria-hidden="true" />
+              <UButton
+                v-if="l1AddKind(state.categories, state.plan.items, l1.id)"
+                size="xs"
+                variant="ghost"
+                :class="planRowCell.action"
+                @click="onL1AddClick(l1)"
+              >
+                <Plus :class="planRowIconClass" />
+              </UButton>
+              <span v-else :class="planRowCol.actionSlot" aria-hidden="true" />
+              <UButton size="xs" variant="ghost" :class="planRowCell.action" @click="startEditCat(l1)">
+                <Pencil :class="planRowIconClass" />
+              </UButton>
+              <UButton
+                size="xs"
+                variant="ghost"
+                color="error"
+                :class="planRowCell.action"
+                :disabled="!canDelete(state.categories, l1.id)"
+                @click="onRemoveCategory(l1.id)"
+              >
+                <Trash2 :class="planRowIconClass" />
+              </UButton>
           </div>
 
           <PlanProductRows
             v-if="hasDirectProducts(state.plan.items, l1.id, 1)"
             :items="itemsUnderNode(state.plan.items, l1.id, 1)"
-            indent-class="px-3"
+            :level="1"
           />
 
           <ul v-else-if="getChildren(state.categories, l1.id).length" class="border-t border-default/60">
             <template v-for="l2 in getChildren(state.categories, l1.id)" :key="l2.id">
               <li class="border-b border-default/40 last:border-0">
-                <div class="flex items-center gap-2 pl-4 pr-3 py-2 min-h-[44px] bg-default/20">
-                  <template v-if="editingCatId === l2.id">
-                    <UInput v-model="editCatName" size="sm" class="flex-1" @keyup.enter="confirmEditCat" />
-                    <UButton size="xs" @click="confirmEditCat">{{ t('common.save') }}</UButton>
-                  </template>
-                  <template v-else>
-                    <span class="flex-1 text-sm min-w-0 truncate">{{ l2.name }}</span>
-                    <span class="text-[10px] text-muted tabular-nums shrink-0 hidden sm:inline">
-                      {{ t('plan.ofTotal') }} {{ categoryTotalPercent(state.categories, l2.id).toFixed(1) }}%
-                    </span>
-                    <UInput
-                      :model-value="l2.weightOfParent ?? 0"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
+                <PlanRowMobile
+                  :row-key="planRowKey('cat', l2.id)"
+                  :name="l2.name"
+                  :name-class="planRowNameClass[2]"
+                  :within="formatWithinGroupWeight(l2)"
+                  :total="formatTotalPercent(l2.id)"
+                  :level="2"
+                  :show-warn="showChildSumWarn(l2.id, 2)"
+                  metrics-indent
+                  extra-class="py-2 bg-default/20"
+                  @warn="notifyChildSumUnbalanced"
+                >
+                  <template #actions>
+                    <UButton
+                      v-if="canAddProduct(state.categories, state.plan.items, l2.id, 2)"
                       size="xs"
-                      class="w-[4.25rem] shrink-0"
-                      @update:model-value="updateCategory(l2.id, { weightOfParent: Number($event) })"
+                      variant="ghost"
+                      :class="planRowCell.action"
+                      @click="openAddProduct(l1, l2)"
                     >
-                      <template #trailing>%</template>
-                    </UInput>
-                    <span
-                      class="text-[10px] tabular-nums shrink-0 w-10 text-right"
-                      :class="childSumClass(l2.id, 2)"
-                      :title="t('plan.childSum')"
+                      <Plus :class="planRowIconClass" />
+                    </UButton>
+                    <span v-else :class="planRowCol.actionSlot" aria-hidden="true" />
+                    <UButton size="xs" variant="ghost" :class="planRowCell.action" @click="startEditCat(l2)">
+                      <Pencil :class="planRowIconClass" />
+                    </UButton>
+                    <UButton
+                      size="xs"
+                      variant="ghost"
+                      color="error"
+                      :class="planRowCell.action"
+                      :disabled="!canDelete(state.categories, l2.id)"
+                      @click="onRemoveCategory(l2.id)"
                     >
-                      {{ nodeSiblingSumLabel(state.categories, state.plan.items, l2.id, 2) }}
-                    </span>
-                    <div class="flex gap-0.5 shrink-0">
+                      <Trash2 :class="planRowIconClass" />
+                    </UButton>
+                  </template>
+                </PlanRowMobile>
+
+                <div :class="[planRowGrid, 'py-2 bg-default/20']">
+                  <span :class="planRowCell.icon" aria-hidden="true" />
+                    <span :class="planRowNameClass[2]">{{ l2.name }}</span>
+                    <div :class="planRowCell.childSum">
                       <UButton
-                        v-if="canAddProduct(state.categories, state.plan.items, l2.id, 2)"
+                        v-if="showChildSumWarn(l2.id, 2)"
                         size="xs"
                         variant="ghost"
-                        color="primary"
-                        @click="addProduct(l1, l2)"
+                        color="warning"
+                        :class="planRowCell.action"
+                        :aria-label="t('plan.childSumWarnTitle')"
+                        @click="notifyChildSumUnbalanced"
                       >
-                        <ListPlus class="size-3.5" />
-                      </UButton>
-                      <UButton
-                        v-if="canAddChildCategory(state.categories, state.plan.items, l2.id, 2)"
-                        size="xs"
-                        variant="ghost"
-                        @click="startAddCat(l2.id)"
-                      >
-                        <Plus class="size-3.5" />
-                      </UButton>
-                      <UButton size="xs" variant="ghost" @click="startEditCat(l2)"><Pencil class="size-3.5" /></UButton>
-                      <UButton size="xs" variant="ghost" color="error" :disabled="!canDelete(state.categories, l2.id)" @click="removeCategory(l2.id)">
-                        <Trash2 class="size-3.5" />
+                        <AlertTriangle :class="planRowIconClass" />
                       </UButton>
                     </div>
-                  </template>
+                    <span :class="planRowWithinGroupClass[2]">{{ formatWithinGroupWeight(l2) }}</span>
+                    <span :class="planRowCell.ofTotal">{{ formatTotalPercent(l2.id) }}</span>
+                    <span :class="planRowCell.actionsGap" aria-hidden="true" />
+                    <UButton
+                      v-if="canAddProduct(state.categories, state.plan.items, l2.id, 2)"
+                      size="xs"
+                      variant="ghost"
+                      :class="planRowCell.action"
+                      @click="openAddProduct(l1, l2)"
+                    >
+                      <Plus :class="planRowIconClass" />
+                    </UButton>
+                    <span v-else :class="planRowCol.actionSlot" aria-hidden="true" />
+                    <UButton size="xs" variant="ghost" :class="planRowCell.action" @click="startEditCat(l2)">
+                      <Pencil :class="planRowIconClass" />
+                    </UButton>
+                    <UButton
+                      size="xs"
+                      variant="ghost"
+                      color="error"
+                      :class="planRowCell.action"
+                      :disabled="!canDelete(state.categories, l2.id)"
+                      @click="onRemoveCategory(l2.id)"
+                    >
+                      <Trash2 :class="planRowIconClass" />
+                    </UButton>
                 </div>
 
                 <PlanProductRows
                   v-if="hasDirectProducts(state.plan.items, l2.id, 2)"
                   :items="itemsUnderNode(state.plan.items, l2.id, 2)"
-                  indent-class="pl-4 pr-3"
+                  :level="2"
                 />
-
-                <ul v-else-if="getChildren(state.categories, l2.id).length">
-                  <li v-for="l3 in getChildren(state.categories, l2.id)" :key="l3.id" class="border-t border-default/30">
-                    <div class="flex items-center gap-2 pl-8 pr-3 py-2 min-h-[42px]">
-                      <template v-if="editingCatId === l3.id">
-                        <UInput v-model="editCatName" size="sm" class="flex-1" @keyup.enter="confirmEditCat" />
-                        <UButton size="xs" @click="confirmEditCat">{{ t('common.save') }}</UButton>
-                      </template>
-                      <template v-else>
-                        <span class="flex-1 text-xs font-medium min-w-0 truncate">{{ l3.name }}</span>
-                        <span class="text-[10px] text-muted tabular-nums shrink-0 hidden sm:inline">
-                          {{ t('plan.ofTotal') }} {{ categoryTotalPercent(state.categories, l3.id).toFixed(1) }}%
-                        </span>
-                        <UInput
-                          :model-value="l3.weightOfParent ?? 0"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          size="xs"
-                          class="w-[4.25rem] shrink-0"
-                          @update:model-value="updateCategory(l3.id, { weightOfParent: Number($event) })"
-                        >
-                          <template #trailing>%</template>
-                        </UInput>
-                        <span
-                          class="text-[10px] tabular-nums shrink-0 w-10 text-right"
-                          :class="childSumClass(l3.id, 3)"
-                          :title="t('plan.childSum')"
-                        >
-                          {{ nodeSiblingSumLabel(state.categories, state.plan.items, l3.id, 3) }}
-                        </span>
-                        <div class="flex gap-0.5 shrink-0">
-                          <UButton size="xs" variant="ghost" color="primary" @click="addProduct(l1, l2, l3)">
-                            <ListPlus class="size-3.5" />
-                          </UButton>
-                          <UButton size="xs" variant="ghost" @click="startEditCat(l3)"><Pencil class="size-3.5" /></UButton>
-                          <UButton size="xs" variant="ghost" color="error" :disabled="!canDelete(state.categories, l3.id)" @click="removeCategory(l3.id)">
-                            <Trash2 class="size-3.5" />
-                          </UButton>
-                        </div>
-                      </template>
-                    </div>
-
-                    <PlanProductRows
-                      :items="itemsUnderNode(state.plan.items, l3.id, 3)"
-                      indent-class="pl-8 pr-3"
-                    />
-                  </li>
-                </ul>
               </li>
             </template>
           </ul>
@@ -362,16 +543,93 @@ function childSumClass(nodeId: string, level: 1 | 2 | 3) {
     </UButton>
     </template>
 
+    <UModal v-model:open="l1AddChoiceModalOpen" :title="t('plan.addUnderL1Title', { name: l1AddChoiceTarget?.name ?? '' })">
+      <template #body>
+        <p class="text-sm text-muted mb-4">{{ t('plan.addUnderL1Hint') }}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <UButton block variant="outline" size="lg" @click="chooseAddSubCategoryFromL1">
+            {{ t('plan.addAsSubCategory') }}
+          </UButton>
+          <UButton block variant="outline" size="lg" @click="chooseAddProductFromL1">
+            {{ t('plan.addAsProduct') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
     <UModal v-model:open="addModalOpen" :title="addModalTitle">
       <template #body>
-        <UFormField :label="t('plan.name')">
-          <UInput v-model="newCatName" autofocus @keyup.enter="confirmAddCat" />
-        </UFormField>
+        <div class="space-y-3">
+          <UFormField :label="t('plan.name')" :class="planModalFormField">
+            <UInput v-model="newCatName" :class="planModalInput" autofocus @keyup.enter="confirmAddCat" />
+          </UFormField>
+          <UFormField :label="t('plan.targetWeight')" :class="planModalFormField">
+            <UInput v-model.number="newCatWeight" :class="planModalInput" type="number" min="0" max="100" step="0.1">
+              <template #trailing>%</template>
+            </UInput>
+          </UFormField>
+        </div>
       </template>
       <template #footer="{ close }">
         <div class="flex justify-end gap-2 w-full">
           <UButton variant="ghost" @click="close">{{ t('common.cancel') }}</UButton>
           <UButton :disabled="!newCatName.trim()" @click="confirmAddCat">{{ t('common.save') }}</UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="editCatModalOpen" :title="t('plan.editCategory')">
+      <template #body>
+        <div class="space-y-3">
+          <UFormField v-if="editingCatIsL1" :label="t('plan.pickIcon')">
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="opt in L1_ICON_OPTIONS"
+                :key="opt.key"
+                type="button"
+                class="rounded-lg border p-2 transition-colors"
+                :class="editingCatNode?.iconKey === opt.key ? 'border-primary bg-primary/10' : 'border-default'"
+                @click="editingCatId && updateCategory(editingCatId, { iconKey: opt.key as L1IconKey })"
+              >
+                <PlanL1Icon :icon-key="opt.key" size="sm" />
+              </button>
+            </div>
+          </UFormField>
+          <UFormField :label="t('plan.name')" :class="planModalFormField">
+            <UInput v-model="editCatName" :class="planModalInput" autofocus @keyup.enter="confirmEditCat" />
+          </UFormField>
+          <UFormField :label="t('plan.targetWeight')" :class="planModalFormField">
+            <UInput v-model.number="editCatWeight" :class="planModalInput" type="number" min="0" max="100" step="0.1">
+              <template #trailing>%</template>
+            </UInput>
+          </UFormField>
+        </div>
+      </template>
+      <template #footer="{ close }">
+        <div class="flex justify-end gap-2 w-full">
+          <UButton variant="ghost" @click="close">{{ t('common.cancel') }}</UButton>
+          <UButton :disabled="!editCatName.trim()" @click="confirmEditCat">{{ t('common.save') }}</UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="productAddModalOpen" :title="t('plan.addProduct')">
+      <template #body>
+        <div class="space-y-3">
+          <UFormField :label="t('plan.itemName')" :class="planModalFormField">
+            <UInput v-model="newProductName" :class="planModalInput" autofocus @keyup.enter="confirmAddProduct" />
+          </UFormField>
+          <UFormField :label="t('plan.targetWeight')" :class="planModalFormField">
+            <UInput v-model.number="newProductWeight" :class="planModalInput" type="number" min="0" max="100" step="0.1">
+              <template #trailing>%</template>
+            </UInput>
+          </UFormField>
+        </div>
+      </template>
+      <template #footer="{ close }">
+        <div class="flex justify-end gap-2 w-full">
+          <UButton variant="ghost" @click="close">{{ t('common.cancel') }}</UButton>
+          <UButton :disabled="!newProductName.trim()" @click="confirmAddProduct">{{ t('common.save') }}</UButton>
         </div>
       </template>
     </UModal>

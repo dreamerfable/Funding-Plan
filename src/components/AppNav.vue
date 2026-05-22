@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { LayoutDashboard, PieChart, LineChart, Camera, Settings } from 'lucide-vue-next'
+import { LayoutDashboard, PieChart, LineChart, Camera } from 'lucide-vue-next'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -10,8 +10,7 @@ const items = [
   { to: '/', label: 'nav.home', icon: LayoutDashboard },
   { to: '/plan', label: 'nav.plan', icon: PieChart },
   { to: '/snapshots', label: 'nav.snapshots', icon: Camera },
-  { to: '/analysis', label: 'nav.analysis', icon: LineChart },
-  { to: '/settings', label: 'nav.settings', icon: Settings }
+  { to: '/analysis', label: 'nav.analysis', icon: LineChart }
 ]
 
 function active(path: string) {
@@ -25,7 +24,7 @@ function active(path: string) {
     class="fixed bottom-0 inset-x-0 z-50 border-t border-default/80 bg-default/90 backdrop-blur-xl shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.35)] pb-[env(safe-area-inset-bottom)]"
     aria-label="Main navigation"
   >
-    <div class="grid grid-cols-5 gap-1 px-2 pt-2 pb-2 max-w-lg mx-auto sm:max-w-xl md:max-w-2xl">
+    <div class="grid grid-cols-4 gap-1 px-2 pt-2 pb-2 max-w-lg mx-auto sm:max-w-xl md:max-w-2xl">
       <RouterLink
         v-for="item in items"
         :key="item.to"

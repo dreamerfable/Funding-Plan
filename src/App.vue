@@ -4,11 +4,10 @@ import { useHead } from '@unhead/vue'
 import { useColorMode } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { Settings } from 'lucide-vue-next'
 import AppNav from './components/AppNav.vue'
-import { useAppStore } from './composables/useAppStore'
 
 const colorMode = useColorMode({ storageKey: 'funding-plan-theme' })
-const { updateSettings } = useAppStore()
 const { t } = useI18n()
 const route = useRoute()
 
@@ -21,10 +20,7 @@ useHead({
   meta: [{ name: 'theme-color', content: themeColor }]
 })
 
-function onColorModeChange() {
-  const v = colorMode.value
-  updateSettings({ theme: v === 'auto' ? 'system' : (v as 'light' | 'dark') })
-}
+const onSettings = computed(() => route.path === '/settings')
 </script>
 
 <template>
@@ -39,7 +35,16 @@ function onColorModeChange() {
         </RouterLink>
       </template>
       <template #right>
-        <UColorModeButton @update:model-value="onColorModeChange" />
+        <UButton
+          to="/settings"
+          variant="ghost"
+          color="neutral"
+          square
+          :aria-label="t('nav.settings')"
+          :class="onSettings ? 'text-primary bg-primary/10' : ''"
+        >
+          <Settings class="size-5" />
+        </UButton>
       </template>
     </UHeader>
 

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import AnalysisGroupRow from './AnalysisGroupRow.vue'
-import { buildCategoryAnalysisMap } from '../lib/analysis'
+import AnalysisTrendGroupRow from './AnalysisTrendGroupRow.vue'
 import { getChildren } from '../lib/categories'
-import type { CategoryNode, PlanRowAnalysis, Snapshot } from '../types'
+import type { CategoryNode, Snapshot } from '../types'
 
 const props = defineProps<{
-  snapshot: Snapshot
+  snapshots: Snapshot[]
   categories: CategoryNode[]
 }>()
 
@@ -15,26 +14,15 @@ const { t } = useI18n()
 
 const expandedNodeId = ref<string | null>(null)
 
-const analysisMap = computed(() => buildCategoryAnalysisMap(props.snapshot, props.categories))
+const sortedSnapshots = computed(() =>
+  [...props.snapshots].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+)
 
-const rowGrid =
-  'grid grid-cols-[minmax(6rem,1.35fr)_4.75rem_4.75rem_4.75rem] sm:grid-cols-[minmax(7.5rem,1.5fr)_6rem_6rem_6rem] gap-x-2 items-center'
+const headerGridStyle = computed(() => ({
+  gridTemplateColumns: `minmax(6rem, 1.35fr) ${sortedSnapshots.value.map(() => 'minmax(5rem, 5.75rem)').join(' ')}`
+}))
 
-function metrics(nodeId: string): PlanRowAnalysis {
-  return (
-    analysisMap.value.get(nodeId) ?? {
-      key: nodeId,
-      label: '',
-      level: 1,
-      targetPercent: 0,
-      actualPercent: 0,
-      targetAmount: 0,
-      actualAmount: 0,
-      percentGap: 0,
-      amountGap: 0
-    }
-  )
-}
+const minWidth = computed(() => `${Math.max(320, 140 + sortedSnapshots.value.length * 80)}px`)
 
 function toggleExpand(nodeId: string) {
   expandedNodeId.value = expandedNodeId.value === nodeId ? null : nodeId
@@ -48,26 +36,25 @@ function toggleExpand(nodeId: string) {
 
   <div v-else class="overflow-x-auto -mx-1 px-1">
     <div
-      class="text-[10px] sm:text-xs text-muted tabular-nums min-w-[340px]"
-      :class="rowGrid"
+      class="grid gap-x-2 items-center text-[10px] sm:text-xs text-muted tabular-nums"
+      :style="{ minWidth, ...headerGridStyle }"
     >
       <span class="pt-2 pb-1.5 pr-1">{{ t('analysis.categoryName') }}</span>
-      <span class="text-right pt-2 pb-1.5">{{ t('analysis.planned') }}</span>
-      <span class="text-right pt-2 pb-1.5">{{ t('analysis.actual') }}</span>
-      <span class="text-right pt-2 pb-1.5">{{ t('analysis.drift') }}</span>
+      <span v-for="s in sortedSnapshots" :key="s.id" class="text-right pt-2 pb-1.5 truncate">
+        {{ s.label }}
+      </span>
     </div>
 
-    <ul class="space-y-2 min-w-[340px]">
+    <ul class="space-y-2" :style="{ minWidth }">
       <li
         v-for="l1 in getChildren(categories, null)"
         :key="l1.id"
         class="rounded-xl border border-default/80 overflow-hidden"
       >
-        <AnalysisGroupRow
+        <AnalysisTrendGroupRow
           :node="l1"
-          :snapshot="snapshot"
+          :snapshots="sortedSnapshots"
           :categories="categories"
-          :metrics="metrics(l1.id)"
           :expanded="expandedNodeId === l1.id"
           variant="l1"
           @toggle="toggleExpand(l1.id)"
@@ -79,11 +66,10 @@ function toggleExpand(nodeId: string) {
             :key="l2.id"
             class="border-b border-default/30 last:border-0"
           >
-            <AnalysisGroupRow
+            <AnalysisTrendGroupRow
               :node="l2"
-              :snapshot="snapshot"
+              :snapshots="sortedSnapshots"
               :categories="categories"
-              :metrics="metrics(l2.id)"
               :expanded="expandedNodeId === l2.id"
               variant="l2"
               @toggle="toggleExpand(l2.id)"

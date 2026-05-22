@@ -1,4 +1,4 @@
-export type CategoryLevel = 1 | 2 | 3
+export type CategoryLevel = 1 | 2
 
 export type L1IconKey = 'gold' | 'equity' | 'bond' | 'cash' | 'asset'
 
@@ -9,7 +9,7 @@ export interface CategoryNode {
   parentId: string | null
   /** 同级排序，越小越靠前 */
   sortOrder?: number
-  /** L1=占总资产%; L2=占一级%; L3=占二级%; 配置项=占三级% */
+  /** L1=占总资产%; L2=占一级%; 具体产品=占二级% */
   weightOfParent?: number
   iconKey?: L1IconKey
 }
@@ -19,7 +19,8 @@ export interface PlanItem {
   name: string
   categoryL1Id: string
   categoryL2Id: string
-  categoryL3Id: string
+  /** 已废弃，仅用于旧数据迁移，新数据恒为空 */
+  categoryL3Id?: string
   targetPercent: number
 }
 
@@ -62,7 +63,7 @@ export interface AppState {
   settings: AppSettings
 }
 
-export type AnalysisLevel = 1 | 2 | 3
+export type AnalysisLevel = 1 | 2
 
 export interface PlanRowAnalysis {
   key: string

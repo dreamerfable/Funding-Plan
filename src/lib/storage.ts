@@ -1,5 +1,9 @@
 import type { AppState } from '../types'
-import { normalizeCategorySortOrders } from './categories'
+import {
+  migrateCategoriesToTwoLevels,
+  migratePlanItemsToTwoLevels,
+  normalizeCategorySortOrders
+} from './categories'
 import { guessIconKey } from './l1-icons'
 import { newId } from './id'
 
@@ -37,6 +41,11 @@ export function exportStateJson(state: AppState): string {
 }
 
 function migrateState(state: AppState): AppState {
+  migrateCategoriesToTwoLevels(state.categories)
+  migratePlanItemsToTwoLevels(state.plan.items)
+  for (const s of state.snapshots) {
+    migratePlanItemsToTwoLevels(s.frozenPlan.items)
+  }
   for (const c of state.categories) {
     if (c.level === 1 && !c.iconKey) c.iconKey = guessIconKey(c.name)
     if (c.weightOfParent === undefined) c.weightOfParent = 0
