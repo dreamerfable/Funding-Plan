@@ -1,0 +1,39 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: 'DM Sans', 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+
+  --color-emerald-50: oklch(96.5% 0.03 163);
+  --color-emerald-500: oklch(65% 0.15 160);
+  --color-emerald-600: oklch(55% 0.14 160);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply antialiased;
+}
+
+.dark {
+  --ui-primary: var(--ui-color-primary-500);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fade-in 0.35s ease-out forwards;
+}
+
+.glass-card {
+  @apply rounded-2xl border border-default/80 bg-elevated/50 backdrop-blur-sm shadow-sm;
+}
+
+.stat-value {
+  @apply text-2xl sm:text-3xl font-semibold tracking-tight tabular-nums;
+}
