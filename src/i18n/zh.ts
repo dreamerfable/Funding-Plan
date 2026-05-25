@@ -17,6 +17,7 @@ export default {
     vsPrevDown: '较上期下降 {n}',
     vsPrevSame: '较上期持平',
     noCompare: '暂无可对比的上一期',
+    offPlanHoldings: '计划外持仓',
     noSnapshot: '尚未录入持仓快照',
     noSnapshotHint: '请先在「快照」中录入一期持仓',
     l2Title: '二级分类偏离',

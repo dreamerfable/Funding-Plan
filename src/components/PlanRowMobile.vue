@@ -6,7 +6,8 @@ import { usePlanMobileExpand } from '../composables/usePlanMobileExpand'
 import {
   planRowCell,
   planRowIconClass,
-  planRowMetricTotalClass,
+  planRowMetricTotalClassL1,
+  planRowMetricTotalClassL2,
   planRowMobile,
   planRowMobileActions,
   planRowMobileActionsRow,
@@ -27,6 +28,8 @@ const props = withDefaults(
     showWarn?: boolean
     showWithin?: boolean
     metricsIndent?: boolean
+    withinClass?: string
+    totalClass?: string
     extraClass?: string
   }>(),
   { showWithin: true }
@@ -61,8 +64,13 @@ function onRowClick() {
         >
           <AlertTriangle :class="planRowIconClass" />
         </UButton>
-        <span v-if="showWithin" :class="planRowWithinGroupClass[level]">{{ within }}</span>
-        <span :class="planRowMetricTotalClass">{{ total }}</span>
+        <span v-if="showWithin" :class="withinClass ?? planRowWithinGroupClass[level]">{{ within }}</span>
+        <span
+          :class="
+            totalClass ??
+            (level === 1 ? planRowMetricTotalClassL1 : planRowMetricTotalClassL2)
+          "
+        >{{ total }}</span>
       </div>
     </div>
     <div v-show="expanded" :class="planRowMobileActionsRow" @click.stop>

@@ -10,9 +10,9 @@ import {
 } from '../../lib/analysis'
 import { getNode } from '../../lib/categories'
 import {
-  formatAnalysisGapPercent,
+  formatAnalysisGapPercentTrimmed,
   formatAnalysisMoney,
-  formatHomePercentInt
+  formatAnalysisPercentTrimmed
 } from '../../utils/format'
 import type { CategoryNode, PlanRowAnalysis, Snapshot } from '../../types'
 
@@ -94,8 +94,9 @@ const metricCols = 'grid grid-cols-3 gap-2 text-center tabular-nums'
 </script>
 
 <template>
-  <section class="home-panel flex flex-col px-3 pt-2 pb-2 min-h-0">
-    <p class="text-sm font-semibold text-muted px-1 mb-2 shrink-0">{{ t('home.driftByGroup') }}</p>
+  <section class="home-panel flex flex-col min-h-0">
+    <div class="w-full max-w-4xl mx-auto flex flex-col flex-1 min-h-0 px-3 sm:px-4 pt-2 pb-2">
+      <p class="text-sm font-semibold text-muted px-1 mb-2 shrink-0">{{ t('home.driftByGroup') }}</p>
 
     <div v-if="!l1List.length" class="flex flex-1 items-center justify-center text-sm text-muted">
       —
@@ -118,30 +119,60 @@ const metricCols = 'grid grid-cols-3 gap-2 text-center tabular-nums'
       >
         <div class="flex flex-col items-center text-center px-2 py-3 gap-1">
           <p class="text-xs text-muted">{{ t('home.sectionTarget') }}</p>
-          <p class="text-lg font-semibold tabular-nums leading-tight">
-            {{ formatHomePercentInt(l1Metrics.targetPercent) }}
-          </p>
-          <p class="text-[10px] text-muted tabular-nums">
-            {{ formatAnalysisMoney(l1Metrics.targetAmount, locale) }}
-          </p>
+          <template v-if="showAmount">
+            <p class="text-lg font-semibold tabular-nums leading-tight">
+              {{ formatAnalysisMoney(l1Metrics.targetAmount, locale) }}
+            </p>
+            <p class="text-[10px] text-muted tabular-nums">
+              {{ formatAnalysisPercentTrimmed(l1Metrics.targetPercent) }}
+            </p>
+          </template>
+          <template v-else>
+            <p class="text-lg font-semibold tabular-nums leading-tight">
+              {{ formatAnalysisPercentTrimmed(l1Metrics.targetPercent) }}
+            </p>
+            <p class="text-[10px] text-muted tabular-nums">
+              {{ formatAnalysisMoney(l1Metrics.targetAmount, locale) }}
+            </p>
+          </template>
         </div>
         <div class="flex flex-col items-center text-center px-2 py-3 gap-1">
           <p class="text-xs text-muted">{{ t('home.sectionHoldings') }}</p>
-          <p class="text-lg font-semibold tabular-nums leading-tight">
-            {{ formatHomePercentInt(l1Metrics.actualPercent) }}
-          </p>
-          <p class="text-[10px] text-muted tabular-nums">
-            {{ formatAnalysisMoney(l1Metrics.actualAmount, locale) }}
-          </p>
+          <template v-if="showAmount">
+            <p class="text-lg font-semibold tabular-nums leading-tight">
+              {{ formatAnalysisMoney(l1Metrics.actualAmount, locale) }}
+            </p>
+            <p class="text-[10px] text-muted tabular-nums">
+              {{ formatAnalysisPercentTrimmed(l1Metrics.actualPercent) }}
+            </p>
+          </template>
+          <template v-else>
+            <p class="text-lg font-semibold tabular-nums leading-tight">
+              {{ formatAnalysisPercentTrimmed(l1Metrics.actualPercent) }}
+            </p>
+            <p class="text-[10px] text-muted tabular-nums">
+              {{ formatAnalysisMoney(l1Metrics.actualAmount, locale) }}
+            </p>
+          </template>
         </div>
         <div class="flex flex-col items-center text-center px-2 py-3 gap-1">
           <p class="text-xs text-muted">{{ t('home.sectionDrift') }}</p>
-          <p class="text-lg font-semibold tabular-nums leading-tight" :class="gapClass(l1Metrics.percentGap)">
-            {{ formatAnalysisGapPercent(l1Metrics.percentGap) }}
-          </p>
-          <p class="text-[10px] tabular-nums" :class="gapClass(l1Metrics.amountGap)">
-            {{ formatAnalysisMoney(l1Metrics.amountGap, locale) }}
-          </p>
+          <template v-if="showAmount">
+            <p class="text-lg font-semibold tabular-nums leading-tight" :class="gapClass(l1Metrics.amountGap)">
+              {{ formatAnalysisMoney(l1Metrics.amountGap, locale) }}
+            </p>
+            <p class="text-[10px] tabular-nums" :class="gapClass(l1Metrics.percentGap)">
+              {{ formatAnalysisGapPercentTrimmed(l1Metrics.percentGap) }}
+            </p>
+          </template>
+          <template v-else>
+            <p class="text-lg font-semibold tabular-nums leading-tight" :class="gapClass(l1Metrics.percentGap)">
+              {{ formatAnalysisGapPercentTrimmed(l1Metrics.percentGap) }}
+            </p>
+            <p class="text-[10px] tabular-nums" :class="gapClass(l1Metrics.amountGap)">
+              {{ formatAnalysisMoney(l1Metrics.amountGap, locale) }}
+            </p>
+          </template>
         </div>
       </div>
 
@@ -170,11 +201,11 @@ const metricCols = 'grid grid-cols-3 gap-2 text-center tabular-nums'
               >
                 <span>
                   <span class="text-muted dark:text-muted/55">{{ t('home.colPlan') }}</span>
-                  <span class="ml-1 font-medium">{{ formatHomePercentInt(block.l2Metrics.targetPercent) }}</span>
+                  <span class="ml-1 font-medium">{{ formatAnalysisPercentTrimmed(block.l2Metrics.targetPercent) }}</span>
                 </span>
                 <span>
                   <span class="text-muted dark:text-muted/55">{{ t('home.colActual') }}</span>
-                  <span class="ml-1 font-medium">{{ formatHomePercentInt(block.l2Metrics.actualPercent) }}</span>
+                  <span class="ml-1 font-medium">{{ formatAnalysisPercentTrimmed(block.l2Metrics.actualPercent) }}</span>
                 </span>
               </div>
             </div>
@@ -192,7 +223,7 @@ const metricCols = 'grid grid-cols-3 gap-2 text-center tabular-nums'
                     {{
                       showAmount
                         ? formatAnalysisMoney(product.targetAmount, locale)
-                        : formatHomePercentInt(product.targetPercent)
+                        : formatAnalysisPercentTrimmed(product.targetPercent)
                     }}
                   </p>
                 </div>
@@ -202,7 +233,7 @@ const metricCols = 'grid grid-cols-3 gap-2 text-center tabular-nums'
                     {{
                       showAmount
                         ? formatAnalysisMoney(product.actualAmount, locale)
-                        : formatHomePercentInt(product.actualPercent)
+                        : formatAnalysisPercentTrimmed(product.actualPercent)
                     }}
                   </p>
                 </div>
@@ -215,7 +246,7 @@ const metricCols = 'grid grid-cols-3 gap-2 text-center tabular-nums'
                     {{
                       showAmount
                         ? formatAnalysisMoney(product.amountGap, locale)
-                        : formatAnalysisGapPercent(product.percentGap)
+                        : formatAnalysisGapPercentTrimmed(product.percentGap)
                     }}
                   </p>
                 </div>
@@ -232,5 +263,6 @@ const metricCols = 'grid grid-cols-3 gap-2 text-center tabular-nums'
         </div>
       </div>
     </template>
+    </div>
   </section>
 </template>

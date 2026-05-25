@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import AnalysisCategoryTree from '../components/AnalysisCategoryTree.vue'
 import AnalysisChartScopePicker from '../components/AnalysisChartScopePicker.vue'
 import BarCompareChart from '../components/charts/BarCompareChart.vue'
+import RadarCompareChart from '../components/charts/RadarCompareChart.vue'
 import LineTrendChart from '../components/charts/LineTrendChart.vue'
 import { useAppStore } from '../composables/useAppStore'
 import AnalysisTrendTree from '../components/AnalysisTrendTree.vue'
@@ -53,6 +54,7 @@ const periodChart = computed(() => {
 const chartLabels = computed(() => periodChart.value?.chart.map(r => r.label) ?? [])
 const chartTarget = computed(() => periodChart.value?.chart.map(r => r.targetPercent) ?? [])
 const chartActual = computed(() => periodChart.value?.chart.map(r => r.actualPercent) ?? [])
+const useRadarChart = computed(() => chartLabels.value.length > 2)
 
 const sortedForTrend = computed(() =>
   [...state.snapshots].sort((a, b) => compareSnapshotRecency(b, a))
@@ -101,6 +103,15 @@ const trendChart = computed(() =>
         <UCard v-if="periodChart" class="glass-card">
           <h3 class="font-semibold mb-4">{{ t('analysis.chartTitle') }}</h3>
           <BarCompareChart
+            v-if="!useRadarChart"
+            :labels="chartLabels"
+            :target="chartTarget"
+            :actual="chartActual"
+            :target-label="t('analysis.targetWeight')"
+            :actual-label="t('analysis.actualWeight')"
+          />
+          <RadarCompareChart
+            v-else
             :labels="chartLabels"
             :target="chartTarget"
             :actual="chartActual"

@@ -68,8 +68,8 @@ function itemWeightRight(item: PlanItem, mode: 'parent' | 'total'): string {
       <ul v-else-if="getChildren(state.categories, l1.id).length" class="border-t border-default/50">
         <li v-for="l2 in getChildren(state.categories, l1.id)" :key="l2.id" class="border-b border-default/30 last:border-0">
           <div class="flex items-center gap-2 pl-6 pr-3 py-2 bg-default/25">
-            <span class="flex-1 text-sm truncate">{{ l2.name }}</span>
-            <span class="tabular-nums text-xs font-medium text-muted shrink-0">{{ weightRight(l2, weightMode) }}</span>
+            <span class="flex-1 text-sm truncate text-muted">{{ l2.name }}</span>
+            <span class="tabular-nums text-sm font-medium text-muted shrink-0">{{ weightRight(l2, weightMode) }}</span>
           </div>
 
           <ul v-if="showItems && hasDirectProducts(state.plan.items, l2.id, 2)" class="pb-1">

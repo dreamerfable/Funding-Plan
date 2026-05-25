@@ -3,8 +3,8 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { TrendingDown, TrendingUp, Minus } from 'lucide-vue-next'
 import { useAppStore } from '../../composables/useAppStore'
-import { analyzeSnapshot, overallMatchPercent } from '../../lib/analysis'
-import { formatHomePercentInt, formatPercent } from '../../utils/format'
+import { analyzeSnapshot, overallMatchPercent, snapshotAllocationGap } from '../../lib/analysis'
+import { formatHomePercentInt, formatMoney, formatPercent } from '../../utils/format'
 import type { Snapshot } from '../../types'
 
 const props = defineProps<{
@@ -12,7 +12,7 @@ const props = defineProps<{
   previous: Snapshot | undefined
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { state } = useAppStore()
 
 const latestMatch = computed(() =>
@@ -37,6 +37,30 @@ const compareText = computed(() => {
 
 const compareUp = computed(() => matchDelta.value !== null && matchDelta.value > 0)
 const compareDown = computed(() => matchDelta.value !== null && matchDelta.value < 0)
+
+const allocationGapAbs = computed(() =>
+  props.latest ? Math.abs(snapshotAllocationGap(props.latest)) : 0
+)
+
+const investableAmount = computed(() => {
+  if (!props.latest) return 0
+  return props.latest.totalAmount - props.latest.excludeAmount
+})
+
+const allocationGapRatio = computed(() => {
+  const inv = investableAmount.value
+  if (inv <= 0) return 0
+  return allocationGapAbs.value / inv
+})
+
+const allocationGapPercentInt = computed(() => allocationGapRatio.value * 100)
+
+const allocationGapClass = computed(() => {
+  if (allocationGapRatio.value > 0.05) {
+    return 'text-red-900/85 dark:text-red-400/55'
+  }
+  return ''
+})
 
 const l1Rows = computed(() => {
   if (!props.latest) return []
@@ -79,6 +103,16 @@ function gapClass(gap: number) {
         <TrendingDown v-else-if="compareDown" class="size-5 shrink-0" />
         <Minus v-else class="size-5 shrink-0 opacity-60" />
         <span>{{ compareText }}</span>
+      </div>
+      <div class="mt-5 flex flex-col gap-1 text-lg sm:text-base text-muted/65">
+        <span>{{ t('home.offPlanHoldings') }}</span>
+        <span
+          class="tabular-nums font-medium inline-flex items-baseline justify-center gap-2.5"
+          :class="allocationGapClass"
+        >
+          <span>{{ formatMoney(allocationGapAbs, locale) }}</span>
+          <span>{{ formatHomePercentInt(allocationGapPercentInt) }}</span>
+        </span>
       </div>
     </div>
 

@@ -17,6 +17,7 @@ export default {
     vsPrevDown: 'Down {n} vs prior period',
     vsPrevSame: 'Unchanged vs prior period',
     noCompare: 'No prior period to compare',
+    offPlanHoldings: 'Off-plan holdings',
     noSnapshot: 'No holdings recorded yet',
     noSnapshotHint: 'Add a snapshot under Holdings first',
     l2Title: 'Level-2 class drift',

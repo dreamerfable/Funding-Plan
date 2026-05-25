@@ -28,7 +28,10 @@ import {
   planRowCol,
   planRowGrid,
   planRowIconClass,
+  planRowMetricTotalClassL1,
+  planRowMetricTotalClassL2,
   planRowNameClass,
+  planRowOfTotalClass,
   planRowCard,
   planModalFormField,
   planModalInput,
@@ -308,6 +311,7 @@ function onSaveClick() {
             :level="1"
             :show-warn="showChildSumWarn(l1.id, 1)"
             :show-within="showCategoryWithinGroup(1)"
+            :total-class="planRowMetricTotalClassL1"
             extra-class="py-2.5"
             @warn="notifyChildSumUnbalanced"
           >
@@ -407,7 +411,7 @@ function onSaveClick() {
               <span :class="planRowWithinGroupClass[1]">
                 <template v-if="showCategoryWithinGroup(1)">{{ formatWithinGroupWeight(l1) }}</template>
               </span>
-              <span :class="planRowCell.ofTotal">{{ formatTotalPercent(l1.id) }}</span>
+              <span :class="planRowOfTotalClass[1]">{{ formatTotalPercent(l1.id) }}</span>
               <span :class="planRowCell.actionsGap" aria-hidden="true" />
               <UButton
                 v-if="l1AddKind(state.categories, state.plan.items, l1.id)"
@@ -450,6 +454,7 @@ function onSaveClick() {
                   :within="formatWithinGroupWeight(l2)"
                   :total="formatTotalPercent(l2.id)"
                   :level="2"
+                  :total-class="planRowMetricTotalClassL2"
                   :show-warn="showChildSumWarn(l2.id, 2)"
                   metrics-indent
                   extra-class="py-2 bg-default/20"
@@ -499,7 +504,7 @@ function onSaveClick() {
                       </UButton>
                     </div>
                     <span :class="planRowWithinGroupClass[2]">{{ formatWithinGroupWeight(l2) }}</span>
-                    <span :class="planRowCell.ofTotal">{{ formatTotalPercent(l2.id) }}</span>
+                    <span :class="planRowOfTotalClass[2]">{{ formatTotalPercent(l2.id) }}</span>
                     <span :class="planRowCell.actionsGap" aria-hidden="true" />
                     <UButton
                       v-if="canAddProduct(state.categories, state.plan.items, l2.id, 2)"

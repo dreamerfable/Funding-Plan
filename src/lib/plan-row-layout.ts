@@ -19,7 +19,7 @@ export const planRowCell = {
   name: 'min-w-0 truncate',
   childSum: 'flex items-center justify-end shrink-0',
   withinGroup: 'tabular-nums text-right shrink-0 whitespace-nowrap',
-  ofTotal: 'text-sm tabular-nums text-right shrink-0 whitespace-nowrap pe-2',
+  ofTotal: 'tabular-nums text-right shrink-0 whitespace-nowrap pe-2',
   actionsGap: 'shrink-0',
   action: 'size-7 shrink-0 justify-self-end'
 } as const
@@ -33,21 +33,36 @@ export const planRowCol = {
   editFieldsL1: 'col-start-2 col-span-7 flex min-w-0 items-center gap-2'
 } as const
 
+/** 一级分组：默认字号 + font-bold */
 export const planRowNameClass: Record<1 | 2, string> = {
-  1: `${planRowCell.name} text-sm font-semibold`,
-  2: `${planRowCell.name} text-sm text-muted`
+  1: `${planRowCell.name} font-bold`,
+  2: `${planRowCell.name} text-xs font-semibold text-muted`
 }
 
 export const planRowWithinGroupClass: Record<1 | 2, string> = {
-  1: `${planRowCell.withinGroup} text-xs`,
-  2: `${planRowCell.withinGroup} text-xs text-muted`
+  1: `${planRowCell.withinGroup} font-bold`,
+  2: `${planRowCell.withinGroup} text-xs font-semibold text-muted`
 }
 
-export const planRowProductNameClass = `${planRowCell.name} text-sm`
+export const planRowOfTotalClass: Record<1 | 2, string> = {
+  1: `${planRowCell.ofTotal} font-bold`,
+  2: `${planRowCell.ofTotal} text-xs font-semibold text-muted`
+}
 
-/** 小屏总占比：与桌面 ofTotal 同色，仅字号随断点缩小 */
-export const planRowMetricTotalClass =
-  'text-xs tabular-nums text-right shrink-0 whitespace-nowrap sm:text-sm'
+/** 具体产品：text-sm + 默认字重 */
+export const planRowProductNameClass = `${planRowCell.name} text-sm`
+export const planRowProductWithinClass = `${planRowCell.withinGroup} text-sm`
+export const planRowProductOfTotalClass = `${planRowCell.ofTotal} text-sm`
+
+/** 小屏总占比：与桌面 ofTotal 同级样式，仅布局类 */
+export const planRowMetricTotalClassL1 =
+  'tabular-nums text-right shrink-0 whitespace-nowrap font-bold'
+
+export const planRowMetricTotalClassL2 =
+  'text-xs tabular-nums text-right shrink-0 whitespace-nowrap font-semibold text-muted'
+
+export const planRowMetricTotalClassProduct =
+  'text-sm tabular-nums text-right shrink-0 whitespace-nowrap'
 
 export const planModalFormField = 'w-full'
 export const planModalInput = 'w-full'

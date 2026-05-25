@@ -10,10 +10,12 @@ import {
   planRowCol,
   planRowGrid,
   planRowIconClass,
+  planRowMetricTotalClassProduct,
   planModalFormField,
   planModalInput,
   planRowProductNameClass,
-  planRowWithinGroupClass
+  planRowProductOfTotalClass,
+  planRowProductWithinClass
 } from '../lib/plan-row-layout'
 import { formatPlanPercent, planItemTotalPercent, showPlanWithinGroupPercent } from '../lib/plan'
 import type { PlanItem } from '../types'
@@ -88,6 +90,8 @@ function onRemoveItem(itemId: string) {
         :total="formatItemTotal(item)"
         :level="level"
         :show-within="showItemWithinGroup(item)"
+        :within-class="planRowProductWithinClass"
+        :total-class="planRowMetricTotalClassProduct"
         metrics-indent
         extra-class="py-1.5"
       >
@@ -106,10 +110,10 @@ function onRemoveItem(itemId: string) {
         <span :class="planRowCell.icon" aria-hidden="true" />
         <span :class="planRowProductNameClass">{{ item.name || '—' }}</span>
         <span :class="planRowCell.childSum" aria-hidden="true" />
-        <span :class="planRowWithinGroupClass[level]">
+        <span :class="planRowProductWithinClass">
           <template v-if="showItemWithinGroup(item)">{{ formatItemWithinGroup(item) }}</template>
         </span>
-        <span :class="planRowCell.ofTotal">{{ formatItemTotal(item) }}</span>
+        <span :class="planRowProductOfTotalClass">{{ formatItemTotal(item) }}</span>
         <span :class="planRowCell.actionsGap" aria-hidden="true" />
         <span :class="planRowCol.actionSlot" aria-hidden="true" />
         <UButton size="xs" variant="ghost" :class="planRowCell.action" @click="startEditItem(item)">
