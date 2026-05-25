@@ -235,14 +235,13 @@ export function buildCategoryAnalysisMap(
   return map
 }
 
-/** 组合偏离度：各配置项权重偏离绝对值的算术平均 (pp) */
+/** 组合偏离度：各大类（L1）占比偏离绝对值之和 (pp) */
 export function overallDriftPercent(snapshot: Snapshot, categories: CategoryNode[]): number {
-  const rows = analyzeSnapshot(snapshot, categories).rows
-  if (!rows.length) return 0
-  return rows.reduce((s, r) => s + Math.abs(r.percentGap), 0) / rows.length
+  const rows = analyzeSnapshot(snapshot, categories, 1).rows
+  return rows.reduce((s, r) => s + Math.abs(r.percentGap), 0)
 }
 
-/** 组合匹配度：100% 减去平均权重偏离 */
+/** 组合匹配度：100% − 各大类偏离度绝对值之和 */
 export function overallMatchPercent(snapshot: Snapshot, categories: CategoryNode[]): number {
   return Math.max(0, Math.min(100, 100 - overallDriftPercent(snapshot, categories)))
 }

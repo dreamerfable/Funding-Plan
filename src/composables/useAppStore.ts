@@ -1,5 +1,5 @@
 import { computed, reactive, watch } from 'vue'
-import { useColorMode } from '@vueuse/core'
+import { useAppColorMode } from './useAppColorMode'
 import type { AppLocale, AppSettings, AppState, CategoryNode, InvestmentPlan, L1IconKey, PlanItem, Snapshot } from '../types'
 import { createDefaultState, exportStateJson, loadState, parseImportedState, saveState } from '../lib/storage'
 import { collectDescendantIds } from '../lib/categories'
@@ -16,7 +16,7 @@ function persist() {
 
 watch(() => state, persist, { deep: true })
 
-const colorMode = useColorMode({ storageKey: 'funding-plan-theme' })
+const { mode: colorMode } = useAppColorMode()
 
 watch(
   () => state.settings.theme,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Chart, registerables } from 'chart.js'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useColorMode } from '@vueuse/core'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useAppColorMode } from '../../composables/useAppColorMode'
 
 Chart.register(...registerables)
 
@@ -11,11 +11,10 @@ const props = defineProps<{
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const colorMode = useColorMode()
+const { isDark } = useAppColorMode()
 let chart: Chart | null = null
 
 const palette = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
-const isDark = computed(() => colorMode.value === 'dark')
 
 function render() {
   if (!canvasRef.value) return

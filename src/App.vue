@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useHead } from '@unhead/vue'
-import { useColorMode } from '@vueuse/core'
+import { useAppColorMode } from './composables/useAppColorMode'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Settings } from 'lucide-vue-next'
 import AppNav from './components/AppNav.vue'
 
-const colorMode = useColorMode({ storageKey: 'funding-plan-theme' })
+const { mode: colorMode } = useAppColorMode()
 const { t } = useI18n()
 const route = useRoute()
 

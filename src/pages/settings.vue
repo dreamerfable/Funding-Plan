@@ -2,14 +2,14 @@
 import { computed, ref } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useI18n } from 'vue-i18n'
-import { useColorMode } from '@vueuse/core'
+import { useAppColorMode } from '../composables/useAppColorMode'
 import { Download, Upload, Trash2, Languages, Sun, Moon, Monitor } from 'lucide-vue-next'
 import { useAppStore } from '../composables/useAppStore'
 import type { AppLocale, ThemeMode } from '../types'
 
 const { t } = useI18n()
 const { state, updateSettings, exportJson, importJson, resetAll } = useAppStore()
-const colorMode = useColorMode({ storageKey: 'funding-plan-theme' })
+const { mode: colorMode } = useAppColorMode()
 const toast = useToast()
 const fileInput = ref<HTMLInputElement | null>(null)
 const importError = ref('')

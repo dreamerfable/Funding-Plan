@@ -13,7 +13,7 @@
   <style>html { background-color: #fafafa } html.dark { background-color: #09090b }</style>
   <script>
     (function () {
-      var mode = localStorage.getItem('funding-plan-theme') || localStorage.getItem('vueuse-color-scheme') || 'auto'
+      var mode = localStorage.getItem('funding-plan-theme') || 'auto'
       var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
       if (dark) {
         document.documentElement.classList.add('dark')

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useI18n } from 'vue-i18n'
 import AnalysisCategoryTree from '../components/AnalysisCategoryTree.vue'
@@ -8,7 +8,12 @@ import BarCompareChart from '../components/charts/BarCompareChart.vue'
 import LineTrendChart from '../components/charts/LineTrendChart.vue'
 import { useAppStore } from '../composables/useAppStore'
 import AnalysisTrendTree from '../components/AnalysisTrendTree.vue'
-import { analyzeChartForScope, trendChartSeriesForScope } from '../lib/analysis'
+import {
+  analyzeChartForScope,
+  compareSnapshotRecency,
+  getLatestSnapshot,
+  trendChartSeriesForScope
+} from '../lib/analysis'
 
 const { t } = useI18n()
 const { state } = useAppStore()
@@ -20,14 +25,24 @@ const selectedId = ref('')
 const chartScopeId = ref<string>('all')
 const trendChartScopeId = ref<string>('all')
 
-const snapshots = computed(() =>
-  [...state.snapshots].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))
+const snapshots = computed(() => [...state.snapshots].sort(compareSnapshotRecency))
+
+watch(
+  () => state.snapshots,
+  () => {
+    const latest = getLatestSnapshot(state.snapshots)
+    if (!latest) {
+      selectedId.value = ''
+      return
+    }
+    if (!selectedId.value || !state.snapshots.some(s => s.id === selectedId.value)) {
+      selectedId.value = latest.id
+    }
+  },
+  { immediate: true, deep: true }
 )
 
-const selected = computed(() => {
-  const id = selectedId.value || snapshots.value[0]?.id
-  return snapshots.value.find(s => s.id === id)
-})
+const selected = computed(() => snapshots.value.find(s => s.id === selectedId.value))
 
 const periodChart = computed(() => {
   if (!selected.value) return null
@@ -40,7 +55,7 @@ const chartTarget = computed(() => periodChart.value?.chart.map(r => r.targetPer
 const chartActual = computed(() => periodChart.value?.chart.map(r => r.actualPercent) ?? [])
 
 const sortedForTrend = computed(() =>
-  [...state.snapshots].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+  [...state.snapshots].sort((a, b) => compareSnapshotRecency(b, a))
 )
 const trendChart = computed(() =>
   trendChartSeriesForScope(sortedForTrend.value, state.categories, trendChartScopeId.value)
@@ -72,10 +87,9 @@ const trendChart = computed(() =>
       <div v-if="tab === 'period'" class="mt-4 space-y-4">
         <UFormField :label="t('analysis.selectSnapshot')" class="w-full">
           <USelect
+            v-model="selectedId"
             class="w-full"
-            :model-value="selected?.id ?? snapshots[0]?.id"
             :items="snapshots.map(s => ({ label: `${s.label} (${s.recordedAt.slice(0, 10)})`, value: s.id }))"
-            @update:model-value="selectedId = $event"
           />
         </UFormField>
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Chart, registerables } from 'chart.js'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useColorMode } from '@vueuse/core'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useAppColorMode } from '../../composables/useAppColorMode'
 
 Chart.register(...registerables)
 
@@ -15,10 +15,8 @@ const props = defineProps<{
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const colorMode = useColorMode()
+const { isDark } = useAppColorMode()
 let chart: Chart | null = null
-
-const isDark = computed(() => colorMode.value === 'dark')
 
 const TICK_FONT_SIZE = 11
 
